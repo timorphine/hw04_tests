@@ -58,8 +58,7 @@ class PostCreateForm(TestCase):
         obj_count = Post.objects.count()
         post_form = {
             'author': 'TestUser',
-            'text': 'AnotherText',
-            'group': 'TestGroup'
+            'text': 'OneMoreText'
         }
         response = self.authorized_client.post(
             reverse(
@@ -74,15 +73,8 @@ class PostCreateForm(TestCase):
             response,
             reverse(
                 'posts:post_detail',
-                args=[PostCreateForm.post.id]
+                kwargs={'post_id': PostCreateForm.post.id}
             )
         )
         self.assertEqual(Post.objects.count(), obj_count)
-        self.assertEqual(
-            Post.objects.get(PostCreateForm.post.id).author,
-            PostCreateForm.post.author
-        )
-        self.assertEqual(
-            Post.objects.get(PostCreateForm.post.id).text,
-            post_form['text']
-        )
+        self.assertNotEqual(post_form['text'], PostCreateForm.post.text)
