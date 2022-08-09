@@ -26,11 +26,11 @@ class PostCreateForm(TestCase):
         self.authorized_client = Client()
         self.authorized_client.force_login(PostCreateForm.user)
 
-    def test_post_goes_in_database(self):
-        """Проверяем появление поста в БД при создании и редирект"""
+    def test_authorized_user_can_make_post(self):
+        """Проверяем возможность создания поста авторизованным пользователем"""
         obj_count = Post.objects.count()
         post_form = {
-            'author': 'TestUser',
+            'group': PostCreateForm.group.id,
             'text': 'AnotherText'
         }
         response = self.authorized_client.post(
@@ -42,30 +42,33 @@ class PostCreateForm(TestCase):
             response,
             reverse(
                 'posts:profile',
-                kwargs={'username': 'TestUser'}
+                kwargs={'username': PostCreateForm.user}
             )
         )
         self.assertEqual(Post.objects.count(), obj_count + 1)
+        last_post = Post.objects.latest('pub_date')
         self.assertTrue(
             Post.objects.filter(
-                author=PostCreateForm.post.author,
-                text=PostCreateForm.post.text
+                text=post_form['text']
             ).exists()
         )
+        self.assertEqual(last_post.text, post_form['text'])
+        self.assertEqual(last_post.group, self.post.group)
+        self.assertEqual(last_post.author, self.post.author)
 
-    def test_edited_post(self):
+    def test_edit_post(self):
         """Проверяем изменение поста в БД после редакции"""
         obj_count = Post.objects.count()
-        post_form = {
-            'author': 'TestUser',
+        changed_post_form = {
+            'group': PostCreateForm.group.id,
             'text': 'OneMoreText'
         }
         response = self.authorized_client.post(
             reverse(
                 'posts:post_edit',
-                args=[PostCreateForm.post.id]
+                args=[self.post.id]
             ),
-            data=post_form,
+            data=changed_post_form,
             follow=True
 
         )
@@ -73,8 +76,16 @@ class PostCreateForm(TestCase):
             response,
             reverse(
                 'posts:post_detail',
-                kwargs={'post_id': PostCreateForm.post.id}
+                kwargs={'post_id': self.post.id}
             )
         )
         self.assertEqual(Post.objects.count(), obj_count)
-        self.assertNotEqual(post_form['text'], PostCreateForm.post.text)
+        self.assertTrue(
+            Post.objects.filter(
+                text=changed_post_form['text']
+            ).exists()
+        )
+        changed_post = Post.objects.latest('id')
+        self.assertEqual(changed_post.text, changed_post_form['text'])
+        self.assertEqual(changed_post.group, self.post.group)
+        self.assertEqual(changed_post.author, self.post.author)
