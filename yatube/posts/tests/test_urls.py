@@ -1,8 +1,9 @@
-from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
 from http import HTTPStatus
 
-from posts.models import Post, Group
+from django.contrib.auth import get_user_model
+from django.test import Client, TestCase
+
+from posts.models import Group, Post
 
 User = get_user_model()
 
@@ -25,9 +26,9 @@ class PostsURLTests(TestCase):
 
     def setUp(self):
         self.autorized_client = Client()
-        self.autorized_client.force_login(PostsURLTests.user)
+        self.autorized_client.force_login(self.user)
         self.not_author_client = Client()
-        self.not_author_client.force_login(PostsURLTests.not_author)
+        self.not_author_client.force_login(self.not_author)
 
     def test_home_page_response(self):
         """Тест ответа домашней страницы."""
@@ -85,10 +86,10 @@ class PostsURLTests(TestCase):
     def test_urls_leads_to_right_templates(self):
         templates_url_names = {
             '/': 'posts/index.html',
-            '/group/Test-slug/': 'posts/group_list.html',
-            '/profile/not_author/': 'posts/profile.html',
-            '/posts/1/': 'posts/post_detail.html',
-            '/posts/1/edit/': 'posts/create_post.html',
+            f'/group/{self.group.slug}/': 'posts/group_list.html',
+            f'/profile/{self.not_author}/': 'posts/profile.html',
+            f'/posts/{self.post.id}/': 'posts/post_detail.html',
+            f'/posts/{self.post.id}/edit/': 'posts/create_post.html',
             '/create/': 'posts/create_post.html'
         }
         for address, template in templates_url_names.items():

@@ -1,9 +1,9 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from django.test import TestCase, Client
+from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Post, Group
+from posts.models import Group, Post
 
 User = get_user_model()
 
@@ -25,7 +25,7 @@ class PostsViewsTest(TestCase):
 
     def setUp(self):
         self.authorized_client = Client()
-        self.authorized_client.force_login(PostsViewsTest.user)
+        self.authorized_client.force_login(self.user)
 
     def test_pages_uses_correct_template(self):
         templates_pages_names = {
@@ -34,19 +34,19 @@ class PostsViewsTest(TestCase):
             ),
             'posts/group_list.html': reverse(
                 'posts:group_posts',
-                kwargs={'slug': 'test-slug'}
+                kwargs={'slug': self.group.slug}
             ),
             'posts/profile.html': reverse(
                 'posts:profile',
-                kwargs={'username': 'TestUser'}
+                kwargs={'username': self.post.author}
             ),
             'posts/post_detail.html': reverse(
                 'posts:post_detail',
-                kwargs={'post_id': PostsViewsTest.post.id}
+                kwargs={'post_id': self.post.id}
             ),
             'posts/create_post.html': reverse(
                 'posts:post_edit',
-                kwargs={'post_id': PostsViewsTest.post.id}
+                kwargs={'post_id': self.post.id}
             )
 
         }
@@ -56,10 +56,10 @@ class PostsViewsTest(TestCase):
                 self.assertTemplateUsed(response, template)
 
     def context_test(self, post):
-        self.assertEqual(post.text, PostsViewsTest.post.text)
-        self.assertEqual(post.author, PostsViewsTest.post.author)
-        self.assertEqual(post.group, PostsViewsTest.post.group)
-        self.assertEqual(post.id, PostsViewsTest.post.id)
+        self.assertEqual(post.text, self.post.text)
+        self.assertEqual(post.author, self.post.author)
+        self.assertEqual(post.group, self.post.group)
+        self.assertEqual(post.id, self.post.id)
 
     def test_home_page_show_correct_context(self):
         """Проверяем контекст home_page"""
@@ -74,27 +74,31 @@ class PostsViewsTest(TestCase):
         """Проверяем контекст group_list"""
         response = self.authorized_client.get(
             reverse('posts:group_posts',
-                    kwargs={'slug': 'test-slug'})
+                    kwargs={'slug': self.group.slug})
         )
         self.assertIn('page_obj', response.context)
         post = response.context['page_obj'][0]
+        group = response.context['group']
+        self.assertEqual(group, self.group)
         self.context_test(post)
 
     def test_profile_page_show_correct_context(self):
         """Проверяем контекст profile"""
         response = self.authorized_client.get(
             reverse('posts:profile',
-                    kwargs={'username': 'TestUser'})
+                    kwargs={'username': self.post.author})
         )
         self.assertIn('page_obj', response.context)
         post = response.context['page_obj'][0]
+        author = response.context['author']
+        self.assertEqual(author, self.post.author)
         self.context_test(post)
 
     def test_post_detail_page_show_correct_context(self):
         """Проверяем контекст post_detail"""
         response = self.authorized_client.get(
             reverse('posts:post_detail',
-                    kwargs={'post_id': PostsViewsTest.post.id})
+                    kwargs={'post_id': self.post.id})
         )
         self.assertIn('post_list', response.context)
         post_list = response.context['post_list']
@@ -123,10 +127,11 @@ class PostsViewsTest(TestCase):
         """Проверяем вывод формы create_post при редактировании поста"""
         response = self.authorized_client.get(
             reverse('posts:post_edit',
-                    kwargs={'post_id': PostsViewsTest.post.id})
+                    kwargs={'post_id': self.post.id})
         )
         self.assertIn('form', response.context)
         self.assertIn('is_edit', response.context)
+        self.assertEqual(response.context['is_edit'], True)
         form_fields = {
             'group': forms.fields.ChoiceField,
             'text': forms.fields.CharField
@@ -173,7 +178,7 @@ class PaginatorViewsTest(TestCase):
     def test_group_first_page_contains_ten_records(self):
         response = self.authorized_client.get(
             reverse('posts:group_posts',
-                    kwargs={'slug': 'test-slug-2'})
+                    kwargs={'slug': self.group.slug})
         )
         self.assertEqual(len(response.context['page_obj']), 10)
 
@@ -181,7 +186,7 @@ class PaginatorViewsTest(TestCase):
         response = self.authorized_client.get(
             reverse(
                 'posts:group_posts',
-                kwargs={'slug': 'test-slug-2'}
+                kwargs={'slug': self.group.slug}
             ) + '?page=2'
         )
         self.assertEqual(len(response.context['page_obj']), 3)
@@ -189,7 +194,7 @@ class PaginatorViewsTest(TestCase):
     def test_profile_first_page_contains_ten_records(self):
         response = self.authorized_client.get(
             reverse('posts:profile',
-                    kwargs={'username': 'TestUser2'})
+                    kwargs={'username': self.user})
         )
         self.assertEqual(len(response.context['page_obj']), 10)
 
@@ -197,7 +202,7 @@ class PaginatorViewsTest(TestCase):
         response = self.authorized_client.get(
             reverse(
                 'posts:profile',
-                kwargs={'username': 'TestUser2'}
+                kwargs={'username': self.user}
             ) + '?page=2'
         )
         self.assertEqual(len(response.context['page_obj']), 3)
@@ -237,23 +242,23 @@ class PostCreateTest(TestCase):
             reverse('posts:home_page'),
             reverse(
                 'posts:group_posts',
-                kwargs={'slug': 'test-slug-3'}
+                kwargs={'slug': self.group.slug}
             ),
             reverse(
                 'posts:profile',
-                kwargs={'username': 'TestUser3'}
+                kwargs={'username': self.post.author}
             )
         }
         for url in test_pages:
             with self.subTest(url=url):
-                self.authorized_client.get(url)
-                self.assertEqual(self.another_post, Post.objects.latest('id'))
-                self.assertEqual('NewPost', str(self.another_post.text))
+                response = self.authorized_client.get(url)
+                post = response.context['page_obj'][0]
+                self.assertEqual(post, self.another_post)
 
     def test_that_post_not_in_another_group(self):
         """Проверяем отсутствие поста в другой группе."""
         response = self.authorized_client.get(
             reverse('posts:group_posts',
-                    kwargs={'slug': 'second-slug'})
+                    kwargs={'slug': self.another_group.slug})
         )
         self.assertEqual(len(response.context['page_obj']), 0)

@@ -1,8 +1,8 @@
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
-from django.contrib.auth import get_user_model
 
-from posts.models import Post, Group
+from posts.models import Group, Post
 
 User = get_user_model()
 
@@ -24,13 +24,13 @@ class PostCreateForm(TestCase):
 
     def setUp(self):
         self.authorized_client = Client()
-        self.authorized_client.force_login(PostCreateForm.user)
+        self.authorized_client.force_login(self.user)
 
     def test_authorized_user_can_make_post(self):
         """Проверяем возможность создания поста авторизованным пользователем"""
         obj_count = Post.objects.count()
         post_form = {
-            'group': PostCreateForm.group.id,
+            'group': self.group.id,
             'text': 'AnotherText'
         }
         response = self.authorized_client.post(
@@ -42,16 +42,11 @@ class PostCreateForm(TestCase):
             response,
             reverse(
                 'posts:profile',
-                kwargs={'username': PostCreateForm.user}
+                kwargs={'username': self.user}
             )
         )
         self.assertEqual(Post.objects.count(), obj_count + 1)
-        last_post = Post.objects.latest('pub_date')
-        self.assertTrue(
-            Post.objects.filter(
-                text=post_form['text']
-            ).exists()
-        )
+        last_post = Post.objects.first()
         self.assertEqual(last_post.text, post_form['text'])
         self.assertEqual(last_post.group, self.post.group)
         self.assertEqual(last_post.author, self.post.author)
@@ -60,7 +55,7 @@ class PostCreateForm(TestCase):
         """Проверяем изменение поста в БД после редакции"""
         obj_count = Post.objects.count()
         changed_post_form = {
-            'group': PostCreateForm.group.id,
+            'group': self.group.id,
             'text': 'OneMoreText'
         }
         response = self.authorized_client.post(
@@ -85,7 +80,7 @@ class PostCreateForm(TestCase):
                 text=changed_post_form['text']
             ).exists()
         )
-        changed_post = Post.objects.latest('id')
+        changed_post = Post.objects.get(id=1)
         self.assertEqual(changed_post.text, changed_post_form['text'])
         self.assertEqual(changed_post.group, self.post.group)
         self.assertEqual(changed_post.author, self.post.author)
